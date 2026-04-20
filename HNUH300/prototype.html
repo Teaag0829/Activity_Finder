@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Activity Finder Prototype</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+body {
+  font-family: 'Arial', sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+  text-align: center;
+  color: #333;
+}
+
+h1 {
+  background-color: #4CAF50;
+  color: white;
+  padding: 20px 0;
+  margin: 0;
+  font-size: 2em;
+}
+
+p {
+  font-size: 1.1em;
+  margin: 10px 0 20px;
+}
+
+#filter-container {
+  margin-bottom: 20px;
+}
+
+#map {
+  height: 600px;
+  width: 80%;
+  margin: 0 auto 40px auto;
+  border: 2px solid #4CAF50;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.legend {
+  background: white;
+  padding: 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  line-height: 1.6;
+  font-size: 0.9em;
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+}
+
+.legend span {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 5px;
+  border-radius: 50%;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Local Activity Finder</h1>
+<p>Example Zip Code: 20740 (College Park, MD)</p>
+
+<div id="filter-container">
+  <label for="activityFilter">Filter by activity type: </label>
+  <select id="activityFilter">
+    <option value="All">All</option>
+    <option value="Fitness">Fitness</option>
+    <option value="Outdoor">Outdoor</option>
+    <option value="Social">Social</option>
+    <option value="Arts">Arts</option>
+    <option value="Volunteer">Volunteer</option>
+  </select>
+</div>
+
+<div id="map"></div>
+
+<div class="legend">
+  <div><span style="background:#FF5733"></span>Fitness</div>
+  <div><span style="background:#33C1FF"></span>Outdoor</div>
+  <div><span style="background:#FFC300"></span>Social</div>
+  <div><span style="background:#9B59B6"></span>Arts</div>
+  <div><span style="background:#2ECC71"></span>Volunteer</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+// Initialize map
+var map = L.map('map').setView([38.9897, -76.9378], 13);
+
+// Carto public tiles (avoid OSM referer issues)
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+}).addTo(map);
+
+// Activity data
+var activities = [
+  {coords: [38.9941, -76.9462], name: "Movement Climbing Gym", type: "Fitness", color: "#FF5733" , url: "https://recwell.umd.edu/programs-activities/adventure-program/climbing-wall-bouldering-grotto"},
+  {coords: [38.9,  863, -76.9233], name: "Lake Artemesia Hiking", type: "Outdoor", color: "#33C1FF", url: "https://www.pgparks.com/parks_trails/lake-artemesia-park"},
+  {coords: [38.9880, -76.9443], name: "UMD Art Studio Workshop", type: "Arts", color: "#9B59B6", url: "https://stamp.umd.edu/visit/studio"},
+  {coords: [38.9932, -76.9442], name: "Community Garden Volunteer", type: "Volunteer", color: "#2ECC71", url: "https://agnr.umd.edu/outside-classroom/clubs-and-organizations/community-learning-garden/"},
+  {coords: [38.9882, -76.9448], name: "Trivia Night", type: "Social", color: "#FFC300", url: "https://stamp.umd.edu/directory/stamp_saturdays_trivia_miscellaneous"},
+  {coords: [38.9879, -76.9448], name: "Pottery Workshop", type: "Arts", color: "#9B59B6", url: "https://stamp.umd.edu/visit/studio/pottery"},
+  {coords: [38.9920,-76.9315], name: "Beach Cleanup Volunteer", type: "Volunteer", color: "#2ECC71"},
+  {coords: [38.9935, -76.9455], name: "Martial Arts Class", type: "Fitness", color: "#FF5733", url: "https://terplink.umd.edu/organization/martial-arts-club"},
+  {coords: [38.9880, -76.9450], name: "Bird Watching Meetup", type: "Outdoor", color: "#33C1FF", url: "https://terplink.umd.edu/organization/audubon"},
+  // On-campus gyms with accurate coordinates & URLs
+  {coords: [38.9936, -76.9451], name: "Eppley Recreation Center", type: "Fitness", color: "#FF5733", url: "https://recwell.umd.edu/facilities/eppley-recreation-center"},
+  {coords: [38.985, -76.9365], name: "Ritchie Coliseum Gym", type: "Fitness", color: "#FF5733", url: "https://recwell.umd.edu/facilities/ritchie-coliseum"}
+];
+
+// Debug: click map to see coordinates
+/*
+map.on("click", function(e) {
+  alert("Lat: " + e.latlng.lat + ", Lng: " + e.latlng.lng);
+});
+*/
+// Create markers and store them
+var markers = [];
+activities.forEach(function(act) {
+  var popupContent = `<b>${act.name}</b><br>Type: ${act.type}<br>`;
+  if(act.url) {
+    popupContent += `<a href="${act.url}" target="_blank" style="
+      display:inline-block;
+      margin-top:6px;
+      padding:6px 10px;
+      background:#4CAF50;
+      color:white;
+      text-decoration:none;
+      border-radius:4px;
+    ">View Activity</a>`;
+  }
+
+  var marker = L.circleMarker(act.coords, {
+    color: act.color,
+    radius: 8,
+    fillOpacity: 0.8
+  })
+  .bindPopup(popupContent)
+  .addTo(map);
+
+  marker.activityType = act.type;
+  markers.push(marker);
+});
+
+// Filter functionality
+document.getElementById('activityFilter').addEventListener('change', function(e){
+  var selected = e.target.value;
+  markers.forEach(function(marker){
+    if(selected === "All" || marker.activityType === selected){
+      marker.addTo(map);
+    } else {
+      map.removeLayer(marker);
+    }
+  });
+});
+</script>
+
+</body>
+</html>
